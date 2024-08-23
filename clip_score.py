@@ -89,16 +89,34 @@ def get_clip_score_from_feature(tensor,text_features):
     score=score/tensor.shape[0]
     return score
 
+def get_clip_score_from_feature_thr(tensor,text_features, thr):
+    score=0
+    for i in range(tensor.shape[0]):
+        image2=img_resize(tensor[i])
+        image=clip_normalizer(image2.reshape(1,3,224,224))
+  
+        image_features = model.encode_image(image)
+        image_nor=image_features.norm(dim=-1, keepdim=True)
+        nor= text_features.norm(dim=-1, keepdim=True)
+        similarity = ((image_features/image_nor) @ (text_features/nor).T-thr)**2
+        probs = similarity
+        prob = probs[0][0]
+        score =score + prob
+    score=score/tensor.shape[0]
+    return score
 
 class L_clip_from_feature(nn.Module):
-        def __init__(self):
-                super(L_clip_from_feature, self).__init__()
-                for param in self.parameters():
-                        param.requires_grad = False
-
-        def forward(self, x, text_features):
-                k1 = get_clip_score_from_feature(x,text_features)
-                return k1
+    def __init__(self):
+        super(L_clip_from_feature,self).__init__()
+        for param in self.parameters(): 
+            param.requires_grad = False
+  
+    def forward(self, x, text_features, thr=None):
+        if thr is not None:
+            k1 = get_clip_score_from_feature_thr(x, text_features, thr)
+        else:
+            k1 = get_clip_score_from_feature(x,text_features)
+        return k1
 
 #for clip reconstruction loss
 res_model, res_preprocess = load("RN101", device=device, download_root="./clip_model/")
@@ -161,6 +179,7 @@ class four_margin_loss(nn.Module):
             loss_semi1_semi2=self.margin_loss_S(tensor_mid[0],tensor_mid[1],labels)
             loss_semi2_ref=self.margin_loss_S(tensor_mid[1],tensor3,labels)
             return loss_inp_ref+loss_inp_semi1+loss_semi1_semi2+loss_semi2_ref
+
 
 
 
