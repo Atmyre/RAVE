@@ -5,6 +5,7 @@ import torch.optim
 
 from collections import OrderedDict
 
+
 class LatentVectorsLearner(nn.Module):
     def __init__(self, initials=None):
         super(LatentVectorsLearner, self).__init__()
@@ -41,3 +42,13 @@ class LatentVectorsLearner(nn.Module):
                 else:
                     probs=torch.cat([probs,similarity[:,0]],dim=0)
         return probs
+
+
+def init_latent_vector_learner(config):
+    if config.load_pretrain_guidance:
+        latent_learner=LatentVectorsLearner(config.guidance_pretrain_dir).cuda()
+    else:
+        latent_learner=LatentVectorsLearner().cuda()
+    latent_learner =  torch.nn.DataParallel(latent_learner)
+
+    return latent_learner

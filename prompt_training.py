@@ -7,6 +7,7 @@ import clip
 
 from collections import OrderedDict
 
+
 class TextEncoder(nn.Module):
     def __init__(self, clip_model):
         super().__init__()
@@ -77,3 +78,13 @@ class PromptLearner(nn.Module):
                 else:
                     probs=torch.cat([probs,similarity[:,0]],dim=0)
         return probs
+
+
+def init_prompt_learner(config, model):
+    if config.load_pretrain_guidance:
+        prompt_learner=PromptLearner(config, model, initials=config.guidance_pretrain_dir, ).cuda()
+    else:
+        prompt_learner=PromptLearner(config, model, initials=[" ".join(["X"]*(config.length_prompt))," ".join(["X"]*(config.length_prompt))]).cuda()
+    prompt_learner =  torch.nn.DataParallel(prompt_learner)
+
+    return prompt_learner

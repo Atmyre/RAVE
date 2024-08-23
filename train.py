@@ -16,9 +16,9 @@ from torch.utils.tensorboard import SummaryWriter
 import dataloader_prompt_margin
 import dataloader_prompt_add
 import dataloader_images as dataloader_sharp 
-import model_small
-from prompt_training import PromptLearner, TextEncoder
-from latent_training import LatentVectorsLearner
+from enhancement_model import load_enhancement_model
+from prompt_training import PromptLearner, TextEncoder, init_prompt_learner
+from latent_training import LatentVectorsLearner, init_latent_vector_learner
 from test_function import inference
 
 import clip
@@ -33,54 +33,6 @@ model, preprocess = clip.load("ViT-B/32", device=torch.device("cpu"), download_r
 model.to(device)
 for param in model.parameters():
     param.requires_grad = False
-
-
-def weights_init(m):
-    classname = m.__class__.__name__ 
-    if classname.find('Conv') != -1:
-        m.weight.data.normal_(0.0, 0.02)
-    elif classname.find('BatchNorm') != -1:
-        m.weight.data.normal_(1.0, 0.02)
-        m.bias.data.fill_(0)
-
-
-def init_prompt_learner_clip_lit_orig(config, model):
-    if config.load_pretrain_guidance:
-        prompt_learner=PromptLearner(config, model, initials=config.guidance_pretrain_dir, ).cuda()
-    else:
-        prompt_learner=PromptLearner(config, model, initials=[" ".join(["X"]*(config.length_prompt))," ".join(["X"]*(config.length_prompt))]).cuda()
-    prompt_learner =  torch.nn.DataParallel(prompt_learner)
-
-    return prompt_learner
-
-
-def init_latent_vector_learner_clip_lit_latent(config):
-    if config.load_pretrain_guidance:
-        latent_learner=LatentVectorsLearner(config.guidance_pretrain_dir).cuda()
-    else:
-        latent_learner=LatentVectorsLearner().cuda()
-    latent_learner =  torch.nn.DataParallel(latent_learner)
-
-    return latent_learner
-
-
-def load_unet(config):
-    # load enhancement model, it's same for any mode
-    U_net=model_small.UNet_emb_oneBranch_symmetry_noreflect(3,1).cuda()
-    U_net.apply(weights_init)
-    if config.load_pretrain_unet:
-        print("The load_pretrain is True, thus num_reconstruction_iters is automatically set to 0.")
-        config.num_reconstruction_iters=0
-        state_dict = torch.load(config.unet_pretrain_dir)
-        # create new OrderedDict that does not contain `module.`
-        new_state_dict = OrderedDict()
-        for k, v in state_dict.items():
-            name = k[7:] # remove `module.`
-            new_state_dict[name] = v
-        U_net.load_state_dict(new_state_dict)
-    U_net= torch.nn.DataParallel(U_net)
-
-    return U_net
 
 
 def initialize_guidance_model(config, guidance_learner, guidance_optimizer, guidance_snapshots_dir):
@@ -158,7 +110,6 @@ def initialize_guidance_model(config, guidance_learner, guidance_optimizer, guid
     return best_guidance_learner, guidance_optimizer, min_prompt_loss
                          
 
-
 def train(config):
 
     exp_dir = os.path.join(config.save_dir, config.exp_name)
@@ -175,11 +126,11 @@ def train(config):
     #add pretrained model weights
     guidance_learner = None
     if config.mode == 'clip-lit':
-        guidance_learner = init_prompt_learner_clip_lit_orig(config, model)
+        guidance_learner = init_prompt_learner(config, model)
     elif config.mode == 'clip-lit-latent':
-        guidance_learner = init_latent_vector_learner_clip_lit_latent(config)
+        guidance_learner = init_latent_vector_learner(config)
     
-    U_net = load_unet(config)
+    U_net = load_enhancement_model(config)
     
     # load dataset for enhancement model (UNet) training
     train_dataset = dataloader_sharp.lowlight_loader(config.lowlight_images_path, 

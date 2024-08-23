@@ -18,11 +18,12 @@ from torch.utils.tensorboard import SummaryWriter
 import dataloader_prompt_margin
 import dataloader_prompt_add
 import dataloader_images as dataloader_sharp 
-import model_small
+from enhancement_model import load_enhancement_model
 from test_function import inference
 
 import clip
 import clip_score
+
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 print(device)
@@ -58,33 +59,6 @@ def extract_embs(data_path, model):
 
     return model_embs
 
-def load_unet(config):
-    # load enhancement model, it's same for any mode
-    U_net=model_small.UNet_emb_oneBranch_symmetry_noreflect(3,1).cuda()
-    U_net.apply(weights_init)
-    if config.load_pretrain_unet:
-        print("The load_pretrain is True, thus num_reconstruction_iters is automatically set to 0.")
-        config.num_reconstruction_iters=0
-        state_dict = torch.load(config.unet_pretrain_dir)
-        # create new OrderedDict that does not contain `module.`
-        new_state_dict = OrderedDict()
-        for k, v in state_dict.items():
-            name = k[7:] # remove `module.`
-            new_state_dict[name] = v
-        U_net.load_state_dict(new_state_dict)
-    U_net= torch.nn.DataParallel(U_net)
-
-    return U_net
-
-
-def weights_init(m):
-    classname = m.__class__.__name__ 
-    if classname.find('Conv') != -1:
-        m.weight.data.normal_(0.0, 0.02)
-    elif classname.find('BatchNorm') != -1:
-        m.weight.data.normal_(1.0, 0.02)
-        m.bias.data.fill_(0)
-
 
 def train(config):
     
@@ -97,7 +71,7 @@ def train(config):
     if not os.path.exists(unet_snapshots_dir):
         os.mkdir(unet_snapshots_dir)
 
-    U_net = load_unet(config)
+    U_net = load_enhancement_model(config)
     
     # load dataset for enhancement model (UNet) training
     train_dataset = dataloader_sharp.lowlight_loader(config.lowlight_images_path, 

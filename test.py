@@ -9,7 +9,7 @@ import torchvision
 import torch.backends.cudnn as cudnn
 import torch.optim
 
-import model_small
+from enhancement_model import load_enhancement_model
 import numpy as np
 from PIL import Image
 import glob
@@ -23,8 +23,7 @@ parser.add_argument('-c', '--ckpt', help='test ckpt path', default='./pretrained
 
 args = parser.parse_args()
 
-# U_net = model_small.UNet_emb_oneBranch_symmetry_noreflect(3,1)
-U_net = model_small.UNet_emb_oneBranch_symmetry(3,1)
+U_net = model_small.UNet_emb_oneBranch_symmetry(3, 1, padding_mode='reflect')
 
 state_dict = torch.load(args.ckpt)
 
@@ -36,7 +35,6 @@ for k, v in state_dict.items():
 	new_state_dict[name] = v
 U_net.load_state_dict(new_state_dict)
 U_net.cuda()
-#U_net.load_state_dict(torch.load('./pretrained_models/enhancement_model.pth'))
 
 def lowlight(image_path): 
 

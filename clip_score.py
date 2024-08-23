@@ -6,19 +6,24 @@ import torch.nn as nn
 from torch.nn import functional as F
 from CLIP.clip import load
 
-device = "cuda" if torch.cuda.is_available() else "cpu"
-#load clip
-model, preprocess = clip.load("ViT-B/32", device=torch.device("cpu"), download_root="./clip_model/")#"ViT-B/32"
-model.to(device)
-for para in model.parameters():
-    para.requires_grad = False
 
-def get_clip_score(tensor,words):
+device = "cuda" if torch.cuda.is_available() else "cpu"
+print(device)
+
+#load clip
+model, preprocess = clip.load("ViT-B/32", device=torch.device("cpu"), download_root="./clip_model/")
+model.to(device)
+for param in model.parameters():
+    param.requires_grad = False
+
+clip_normalizer = transforms.Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711))
+img_resize = transforms.Resize((224,224))
+
+
+def get_clip_score(tensor, words):
     score=0
     for i in range(tensor.shape[0]):
         #image preprocess
-        clip_normalizer = transforms.Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711))
-        img_resize = transforms.Resize((224,224))
         image2=img_resize(tensor[i])
         image=clip_normalizer(image2).unsqueeze(0)
         #get probabilitis
@@ -46,34 +51,10 @@ class L_clip(nn.Module):
             return (k1+k2)/2
         return k1
 
-class Prompts(nn.Module):
-    def __init__(self,initials=None):
-        super(Prompts,self).__init__()
-        if initials!=None:
-            text = clip.tokenize(initials).cuda()
-            with torch.no_grad():
-                self.text_features = model.encode_text(text).cuda()
-        else:
-            self.text_features=torch.nn.init.xavier_normal_(nn.Parameter(torch.cuda.FloatTensor(2,512))).cuda()
-
-    def forward(self,tensor):
-        for i in range(tensor.shape[0]):
-            image_features=tensor[i]
-            nor=torch.norm(self.text_features,dim=-1, keepdim=True)
-            similarity = (model.logit_scale.exp() * image_features @ (self.text_features/nor).T).softmax(dim=-1)
-            if(i==0):
-                probs=similarity
-            else:
-                probs=torch.cat([probs,similarity],dim=0)
-        return probs
-
-learn_prompt=Prompts().cuda()
-clip_normalizer = transforms.Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711))
-img_resize = transforms.Resize((224,224))
-
     
-def get_clip_score_from_feature(tensor,text_features):
+def get_clip_score_from_feature(tensor, text_features, thr=None):
     score=0
+
     for i in range(tensor.shape[0]):
         image2=img_resize(tensor[i])
         image=clip_normalizer(image2.reshape(1,3,224,224))
@@ -81,29 +62,18 @@ def get_clip_score_from_feature(tensor,text_features):
         image_features = model.encode_image(image)
         image_nor=image_features.norm(dim=-1, keepdim=True)
         nor= text_features.norm(dim=-1, keepdim=True)
-        similarity = (100.0 * (image_features/image_nor) @ (text_features/nor).T).softmax(dim=-1)
+
+        if thr is None:
+            similarity = (100.0 * (image_features/image_nor) @ (text_features/nor).T).softmax(dim=-1)
+        else:
+            similarity = ((image_features/image_nor) @ (text_features/nor).T-thr)**2
+        
         probs = similarity
-        #print(probs[:5])
         prob = probs[0][0]
         score =score + prob
     score=score/tensor.shape[0]
     return score
 
-def get_clip_score_from_feature_thr(tensor,text_features, thr):
-    score=0
-    for i in range(tensor.shape[0]):
-        image2=img_resize(tensor[i])
-        image=clip_normalizer(image2.reshape(1,3,224,224))
-  
-        image_features = model.encode_image(image)
-        image_nor=image_features.norm(dim=-1, keepdim=True)
-        nor= text_features.norm(dim=-1, keepdim=True)
-        similarity = ((image_features/image_nor) @ (text_features/nor).T-thr)**2
-        probs = similarity
-        prob = probs[0][0]
-        score =score + prob
-    score=score/tensor.shape[0]
-    return score
 
 class L_clip_from_feature(nn.Module):
     def __init__(self):
@@ -112,23 +82,23 @@ class L_clip_from_feature(nn.Module):
             param.requires_grad = False
   
     def forward(self, x, text_features, thr=None):
-        if thr is not None:
-            k1 = get_clip_score_from_feature_thr(x, text_features, thr)
-        else:
-            k1 = get_clip_score_from_feature(x,text_features)
+        k1 = get_clip_score_from_feature(x, text_features, thr)
         return k1
+
 
 #for clip reconstruction loss
 res_model, res_preprocess = load("RN101", device=device, download_root="./clip_model/")
 for para in res_model.parameters():
     para.requires_grad = False
 
-def l2_layers(pred_conv_features, input_conv_features,weight):
+
+def l2_layers(pred_conv_features, input_conv_features, weight):
     weight=torch.tensor(weight).type(pred_conv_features[0].dtype)
     return weight@torch.tensor([torch.square(x_conv - y_conv).mean() for x_conv, y_conv in
             zip(pred_conv_features, input_conv_features)],requires_grad=True)/len(weight)
 
-def get_clip_score_MSE(pred,inp,weight):
+
+def get_clip_score_MSE(pred, inp, weight):
     score=0
     for i in range(pred.shape[0]):
 
@@ -159,22 +129,22 @@ class L_clip_MSE(nn.Module):
 
 
 class four_margin_loss(nn.Module):
-    def __init__(self,dis1=0.7,dis2=0.3):
+    def __init__(self, dis1=0.7, dis2=0.3):
         super(four_margin_loss, self).__init__()
         self.margin_loss_L=nn.MarginRankingLoss(dis1)
         self.margin_loss_S=nn.MarginRankingLoss(dis2)
         self.clip_loss=L_clip_from_feature()
     
-    def forward(self,tensor0,tensor3,labels,num,*tensor_mid):
+    def forward(self, tensor0, tensor3, labels, num, *tensor_mid):
         loss_inp_ref=self.margin_loss_L(tensor0,tensor3,labels)
-        if num==2:
+        if num == 2:
             return loss_inp_ref
-        elif num==3:
+        elif num == 3:
             loss_inp_semi1=self.margin_loss_L(tensor0,tensor_mid[0],labels)
             loss_semi1_ref=self.margin_loss_S(tensor_mid[0],tensor3,labels)
             return loss_inp_ref+loss_inp_semi1+loss_semi1_ref
 
-        elif num==4:
+        elif num == 4:
             loss_inp_semi1=self.margin_loss_L(tensor0,tensor_mid[0],labels)
             loss_semi1_semi2=self.margin_loss_S(tensor_mid[0],tensor_mid[1],labels)
             loss_semi2_ref=self.margin_loss_S(tensor_mid[1],tensor3,labels)
