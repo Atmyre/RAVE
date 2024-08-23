@@ -15,26 +15,16 @@ from PIL import Image
 import glob
 import time
 
-# --- Parse hyper-parameters  --- #
-parser = argparse.ArgumentParser(description='PyTorch implementation of CLIP-LIT (liang. 2023)')
+
+parser = argparse.ArgumentParser()
 parser.add_argument('-i', '--input', help='directory of input folder', default='./input/')
 parser.add_argument('-o', '--output', help='directory of output folder', default='./inference_result/')
-parser.add_argument('-c', '--ckpt', help='test ckpt path', default='./pretrained_models/enhancement_model.pth')
+parser.add_argument('-c', '--unet_pretrain_dir', help='enhancement model pretrained ckpt path', default='./pretrained_models/enhancement_model.pth')
 
-args = parser.parse_args()
+config = parser.parse_args()
+config.load_pretrain_unet = True
 
-U_net = model_small.UNet_emb_oneBranch_symmetry(3, 1, padding_mode='reflect')
-
-state_dict = torch.load(args.ckpt)
-
-# create new OrderedDict that does not contain `module.`
-from collections import OrderedDict
-new_state_dict = OrderedDict()
-for k, v in state_dict.items():
-	name = k[7:] # remove `module.`
-	new_state_dict[name] = v
-U_net.load_state_dict(new_state_dict)
-U_net.cuda()
+U_net = load_enhancement_model(config, padding_mode='reflect')
 
 def lowlight(image_path): 
 
