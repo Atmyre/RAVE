@@ -158,22 +158,21 @@ def train(config):
     iqa_metric = pyiqa.create_metric('psnr', test_y_channel=True, color_space='ycbcr').to(device)
 
     #initial parameters
-    U_net.train()
-    total_iteration=0
-    cur_iteration=0
-    max_score_psnr=-10000
-    pr_last_few_iter=0
-    score_psnr=[0]*30
-    semi_path=['','']
-    pr_semi_path=0
-    best_model=U_net
-    best_prompt=guidance_learner
-    min_prompt_loss=100
-    best_prompt_iter=0
-    best_model_iter=0
-    curr_epoch=0
-    reconstruction_iter=0
-    reinit_flag=0
+    total_iteration = 0
+    cur_iteration = 0
+    max_score_psnr = -10000
+    pr_last_few_iter = 0
+    score_psnr = [0]*30
+    semi_path = ['','']
+    pr_semi_path = 0
+    best_model = U_net
+    best_prompt = guidance_learner
+    min_prompt_loss = 100
+    best_prompt_iter = 0
+    best_model_iter = 0
+    curr_epoch = 0
+    reconstruction_iter = 0
+    reinit_flag = 0
  
     # start training
 
@@ -221,6 +220,7 @@ def train(config):
             # unfreeze all the parameters of UNet model
             for name, param in U_net.named_parameters():
                 param.requires_grad_(True)
+            U_net.train()
 
             for iteration, item in enumerate(train_loader): 
         
@@ -268,9 +268,10 @@ def train(config):
                         best_model = U_net
                         best_model_iter = total_iteration+1
                         print(max_score_psnr)
-                        inference(config.lowlight_images_path,'./'+config.exp_name+'/result_'+config.exp_name+'/result_jt_'+str(total_iteration+1)+"_psnr_or_-loss"+str(max_score_psnr)[:8]+'/',U_net,256)
+                        images_save_path = './'+config.exp_name+'/result_'+config.exp_name+'/result_jt_'+str(total_iteration+1)+"_psnr_or_-loss"+str(max_score_psnr)[:8]+'/'
+                        inference(config.lowlight_images_path, images_save_path, U_net, size=256)
                         if total_iteration > config.num_reconstruction_iters+config.num_clip_pretrained_iters:
-                            semi_path[pr_semi_path] = './'+config.exp_name+'/result_'+config.exp_name+'/result_jt_'+str(total_iteration+1)+"_psnr_or_-loss"+str(max_score_psnr)[:8]+'/'
+                            semi_path[pr_semi_path] = images_save_path
                             print(semi_path)
                         torch.save(U_net.state_dict(), os.path.join(unet_snapshots_dir, "iter_" + str(total_iteration+1) + '.pth'))
                 

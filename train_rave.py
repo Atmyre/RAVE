@@ -19,7 +19,6 @@ import dataloader_prompt_margin
 import dataloader_prompt_add
 import dataloader_images as dataloader_sharp 
 from enhancement_model import load_enhancement_model
-from test_function import inference
 
 import clip
 import clip_score
@@ -146,23 +145,20 @@ def train(config):
     residual_vector = torch.tensor(residual_vector).view(1, 512).to(device)
 
     #initial parameters
-    U_net.train()
-    total_iteration=0
-    cur_iteration=0
-    max_score_psnr=-10000
-    pr_last_few_iter=0
-    score_psnr=[0]*30
-    semi_path=['','']
-    pr_semi_path=0
-    best_model=U_net
-    min_prompt_loss=100
-    best_model_iter=0
-    curr_epoch=0
-    rounds=0
-    reconstruction_iter=0
-    reinit_flag=0
+    total_iteration = 0
+    cur_iteration = 0
+    max_score_psnr = -10000
+    pr_last_few_iter = 0
+    score_psnr = [0]*30
+    best_model = U_net
+    min_prompt_loss = 100
+    best_model_iter = 0
+    curr_epoch = 0
+    reconstruction_iter = 0
+    reinit_flag = 0
 
     #Start training
+    U_net.train()
     
     for epoch in range(config.num_epochs):
 
@@ -227,10 +223,6 @@ def train(config):
                         best_model = U_net
                         best_model_iter = total_iteration+1
                         print(max_score_psnr)
-                        inference(config.lowlight_images_path,'./'+config.exp_name+'/result_'+config.exp_name+'/result_jt_'+str(total_iteration+1)+"_psnr_or_-loss"+str(max_score_psnr)[:8]+'/',U_net,256)
-                        if total_iteration > config.num_reconstruction_iters+config.num_clip_pretrained_iters:
-                            semi_path[pr_semi_path] = './'+config.exp_name+'/result_'+config.exp_name+'/result_jt_'+str(total_iteration+1)+"_psnr_or_-loss"+str(max_score_psnr)[:8]+'/'
-                            print(semi_path)
                         torch.save(U_net.state_dict(), os.path.join(unet_snapshots_dir, "iter_" + str(total_iteration+1) + '.pth')) 
                 
                 if reinit_flag == 1:
