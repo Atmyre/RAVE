@@ -42,7 +42,7 @@ def inference(image_list_path, result_list_path, unet_model, size=None):
         print("Inferencing...")
         for file_name in tqdm(file_list):
             image_path = os.path.join(image_list_path, file_name)
-            enhance_image(image_path, image_list_path, result_list_path, unet_model, size)
+            enhance_image(image_path, image_list_path, result_list_path, unet_model, size=size)
 
 
 if __name__ == '__main__':
