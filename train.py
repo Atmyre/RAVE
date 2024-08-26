@@ -439,19 +439,19 @@ if __name__ == "__main__":
     parser.add_argument('--length_prompt', type=int, default=16)
     parser.add_argument('--thre_train', type=float, default=90)
     parser.add_argument('--thre_prompt', type=float, default=60)
-    parser.add_argument('--reconstruction_train_lr',type=float,default=0.00005)#0.0001
-    parser.add_argument('--train_lr', type=float, default=0.00002)#0.00002#0.00005#0.0001
-    parser.add_argument('--prompt_lr', type=float, default=0.000005)#0.00001#0.00008
+    parser.add_argument('--reconstruction_train_lr',type=float,default=0.00005)
+    parser.add_argument('--train_lr', type=float, default=0.00002)
+    parser.add_argument('--prompt_lr', type=float, default=0.000005)
     parser.add_argument('--T_max', type=float, default=100)
-    parser.add_argument('--eta_min', type=float, default=5e-6)#1e-6
-    parser.add_argument('--weight_decay', type=float, default=0.001)#0.0001
+    parser.add_argument('--eta_min', type=float, default=5e-6)
+    parser.add_argument('--weight_decay', type=float, default=0.001)
     parser.add_argument('--grad_clip_norm', type=float, default=0.1)
-    parser.add_argument('--num_epochs', type=int, default=2000)#3000
-    parser.add_argument('--num_reconstruction_iters', type=int, default=0)#1000
-    parser.add_argument('--num_clip_pretrained_iters', type=int, default=0)#8000
+    parser.add_argument('--num_epochs', type=int, default=2000)
+    parser.add_argument('--num_reconstruction_iters', type=int, default=0)
+    parser.add_argument('--num_clip_pretrained_iters', type=int, default=0)
     parser.add_argument('--noTV_epochs', type=int, default=100)
     parser.add_argument('--train_batch_size', type=int, default=8)
-    parser.add_argument('--prompt_batch_size', type=int, default=16)#32
+    parser.add_argument('--prompt_batch_size', type=int, default=16)
     parser.add_argument('--val_batch_size', type=int, default=4)
     parser.add_argument('--num_workers', type=int, default=4)
     parser.add_argument('--display_iter', type=int, default=20)
