@@ -446,7 +446,7 @@ if __name__ == "__main__":
     parser.add_argument('--eta_min', type=float, default=5e-6)
     parser.add_argument('--weight_decay', type=float, default=0.001)
     parser.add_argument('--grad_clip_norm', type=float, default=0.1)
-    parser.add_argument('--num_epochs', type=int, default=2000)
+    parser.add_argument('--num_epochs', type=int, default=3000)
     parser.add_argument('--num_reconstruction_iters', type=int, default=0)
     parser.add_argument('--num_clip_pretrained_iters', type=int, default=0)
     parser.add_argument('--noTV_epochs', type=int, default=100)
