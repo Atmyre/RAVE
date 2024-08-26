@@ -68,8 +68,8 @@ If you have pre-trained Unet and/or guidance model checkpoints, you can resume t
  --exp_name clip_lit              \
  --train_lr 0.00002               \
  --prompt_lr 0.000005             \
- --num_reconstruction_iters 1000  \
- --num_clip_pretrained_iters 8000 \
+ --num_reconstruction_iters 0     \ # if you have UNet ckpt, change this to 0
+ --num_clip_pretrained_iters 0    \ # if you have guidance model ckpt, change this to 0
  --load_pretrain_unet True        \
  --unet_pretrain_dir path_to_unet_ckpt \
  --load_pretrain_guidance True    \
@@ -104,8 +104,8 @@ If you have pre-trained Unet and/or guidance model checkpoints, you can resume t
  --exp_name clip_lit              \
  --train_lr 0.00002               \
  --prompt_lr 0.0005               \
- --num_reconstruction_iters 1000  \
- --num_clip_pretrained_iters 8000 \
+ --num_reconstruction_iters 0     \ # if you have UNet ckpt, change this to 0
+ --num_clip_pretrained_iters 0    \ # if you have guidance model ckpt, change this to 0
  --load_pretrain_unet True        \
  --unet_pretrain_dir path_to_unet_ckpt \
  --load_pretrain_guidance True    \
@@ -118,7 +118,7 @@ If you have pre-trained Unet and/or guidance model checkpoints, you can resume t
 Train from scratch without shifting the residual vector:
 
 ```
-python train.py \
+python train_rave.py \
  -b path_to_backlit_train_images  \
  -r path_to_well_lit_train_images \
  --exp_name rave                  \
@@ -136,7 +136,7 @@ To train RAVE with shifted residual by n tokens add the following instruction:
 If you have pre-trained Unet, you can resume training as follows:
 
 ```
-python train.py \
+python train_rave.py \
  -b path_to_backlit_train_images  \
  -r path_to_well_lit_train_images \
  --exp_name rave                  \
