@@ -8,6 +8,7 @@ import pyiqa
 import shutil
 from tqdm import tqdm
 from PIL import Image
+from omegaconf import OmegaConf
 
 import torch
 import torch.nn as nn
@@ -62,7 +63,7 @@ def extract_embs(data_path, model):
 def train(config):
     
     #load model
-    exp_dir = os.path.join(config.save_dir, config.exp_name)
+    exp_dir = os.path.join(config.exp.save_dir, config.exp.exp_name)
     unet_snapshots_dir = os.path.join(exp_dir, "snapshots_model")
     
     if not os.path.exists(exp_dir):
@@ -73,13 +74,13 @@ def train(config):
     U_net = load_enhancement_model(config)
     
     # load dataset for enhancement model (UNet) training
-    train_dataset = dataloader_sharp.lowlight_loader(config.lowlight_images_path, 
-                                                     config.overlight_images_path
+    train_dataset = dataloader_sharp.lowlight_loader(config.data.backlit_images_path, 
+                                                     config.data.welllit_images_path
                                                      )
     train_loader = torch.utils.data.DataLoader(train_dataset, 
-                                               batch_size=config.train_batch_size, 
+                                               batch_size=config.train.unet_model.batch_size, 
                                                shuffle=True, 
-                                               num_workers=config.num_workers, 
+                                               num_workers=config.train.num_workers, 
                                                pin_memory=True
                                                )
     
@@ -88,7 +89,7 @@ def train(config):
     L_clip_MSE = clip_score.L_clip_MSE()
     
     # optimizers
-    train_optimizer = torch.optim.Adam(U_net.parameters(), lr=config.train_lr, weight_decay=config.weight_decay)
+    train_optimizer = torch.optim.Adam(U_net.parameters(), lr=config.train.unet_model.lr, weight_decay=config.train.unet_model.weight_decay)
    
     # metric
     iqa_metric = pyiqa.create_metric('psnr', test_y_channel=True, color_space='ycbcr').to(device)
@@ -105,8 +106,8 @@ def train(config):
             vocab_embs[token] = output
 
     
-    embs_neg = extract_embs(config.lowlight_images_path, model)
-    embs_pos = extract_embs(config.normallight_images_path, model)
+    embs_neg = extract_embs(config.data.backlit_images_path, model)
+    embs_pos = extract_embs(config.data.welllit_images_path, model)
 
     vector_pos = np.mean(embs_pos , axis=0)
     vector_pos = vector_pos / np.linalg.norm(vector_pos)
@@ -117,7 +118,7 @@ def train(config):
     residual_vector = vector_pos - vector_neg
     residual_vector = residual_vector / np.linalg.norm(residual_vector)
 
-    if config.remove_first_n_tokens > 0:
+    if config.train.guidance.remove_first_n_tokens > 0:
 
         token_scores = {}
         for key in vocab_embs.keys():
@@ -160,10 +161,10 @@ def train(config):
     #Start training
     U_net.train()
     
-    for epoch in range(config.num_epochs):
+    for epoch in range(config.train.num_epochs):
 
-        if total_iteration < config.num_reconstruction_iters:
-            unet_train_iters = config.num_reconstruction_iters
+        if total_iteration < config.train.unet_model.num_reconstruction_iters:
+            unet_train_iters = config.train.unet_model.num_reconstruction_iters
         elif cur_iteration == 0:
             unet_train_iters = 2100
 
@@ -192,7 +193,7 @@ def train(config):
                 # reconstruction loss
                 clip_MSEloss = 25*L_clip_MSE(enhanced_image, img_lowlight,[1.0,1.0,1.0,1.0,0.5])
 
-                if total_iteration >= config.num_reconstruction_iters:
+                if total_iteration >= config.train.unet_model.num_reconstruction_iters:
                     # training the model with cliploss and reconstruction loss
                     loss = 6*cliploss + 0.9*clip_MSEloss
                 else:
@@ -206,7 +207,7 @@ def train(config):
 
                 # 
                 with torch.no_grad():
-                    if total_iteration<config.num_reconstruction_iters+config.num_clip_pretrained_iters:
+                    if total_iteration<config.train.unet_model.num_reconstruction_iters:
                         score_psnr[pr_last_few_iter] = torch.mean(iqa_metric(img_lowlight, enhanced_image))
                         reconstruction_iter+=1
                         if sum(score_psnr).item()/30.0 < 8 and reconstruction_iter >100:
@@ -217,7 +218,7 @@ def train(config):
                     pr_last_few_iter += 1
                     if pr_last_few_iter == 30:
                         pr_last_few_iter = 0
-                    if (sum(score_psnr).item()/30.0) > max_score_psnr and ((total_iteration+1) % config.display_iter) == 0:
+                    if (sum(score_psnr).item()/30.0) > max_score_psnr and ((total_iteration+1) % config.train.unet_model.display_iter) == 0:
                         max_score_psnr = sum(score_psnr).item()/30.0
                         torch.save(U_net.state_dict(), os.path.join(unet_snapshots_dir, "best_model_round"+str(curr_epoch) + '.pth'))    
                         best_model = U_net
@@ -233,12 +234,12 @@ def train(config):
                     torch.cuda.manual_seed_all(seed)
                     U_net=load_unet(config)
                     reconstruction_iter=0
-                    train_optimizer = torch.optim.Adam(U_net.parameters(), lr=config.train_lr, weight_decay=config.weight_decay)
-                    config.num_reconstruction_iters+=100
+                    train_optimizer = torch.optim.Adam(U_net.parameters(), lr=config.train.unet_model.lr, weight_decay=config.train.unet_model.weight_decay)
+                    config.train.unet_model.num_reconstruction_iters+=100
                     reinit_flag=0
                 
                 # logging
-                if ((total_iteration+1) % config.display_iter) == 0:
+                if ((total_iteration+1) % config.train.unet_model.display_iter) == 0:
                     print("training current learning rate: ",train_optimizer.state_dict()['param_groups'][0]['lr'])
                     print("Loss at iteration", total_iteration+1,"epoch",epoch, ":", loss.item())
                     print("loss_clip",cliploss," reconstruction loss",clip_MSEloss)
@@ -248,7 +249,7 @@ def train(config):
                 cur_iteration += 1
                 total_iteration += 1
 
-                if cur_iteration == unet_train_iters and total_iteration > config.num_reconstruction_iters and (cliploss + 0.9*clip_MSEloss > config.thre_train):
+                if cur_iteration == unet_train_iters and total_iteration > config.train.unet_model.num_reconstruction_iters and (cliploss + 0.9*clip_MSEloss > config.ttrain.unet_model.thr_loss):
                     unet_train_iters += 60
                 elif cur_iteration == unet_train_iters:
                     break
@@ -257,43 +258,10 @@ def train(config):
 if __name__ == "__main__": 
 
     parser = argparse.ArgumentParser()
-
-    # Input Parameters
-    parser.add_argument('--mode', type=str, default="clip-lit") 
-    parser.add_argument('--exp_name', type=str, default='clip_lit') 
-    parser.add_argument('--save_dir', type=str, default="./") 
-    parser.add_argument('-b','--lowlight_images_path', type=str, default="./train_data/BAID_380/resize_input/") 
-    parser.add_argument('--overlight_images_path', type=str, default=None)
-    parser.add_argument('-r','--normallight_images_path', type=str, default='./train_data/DIV2K_384/') 
-    parser.add_argument('--length_prompt', type=int, default=16)
-    parser.add_argument('--thre_train', type=float, default=90)
-    parser.add_argument('--thre_prompt', type=float, default=60)
-    parser.add_argument('--reconstruction_train_lr',type=float,default=0.00005)#0.0001
-    parser.add_argument('--train_lr', type=float, default=0.00002)#0.00002#0.00005#0.0001
-    parser.add_argument('--prompt_lr', type=float, default=0.000005)#0.00001#0.00008
-    parser.add_argument('--T_max', type=float, default=100)
-    parser.add_argument('--eta_min', type=float, default=5e-6)#1e-6
-    parser.add_argument('--weight_decay', type=float, default=0.001)#0.0001
-    parser.add_argument('--grad_clip_norm', type=float, default=0.1)
-    parser.add_argument('--num_epochs', type=int, default=2000)#3000
-    parser.add_argument('--num_reconstruction_iters', type=int, default=0)#1000
-    parser.add_argument('--num_clip_pretrained_iters', type=int, default=0)#8000
-    parser.add_argument('--noTV_epochs', type=int, default=100)
-    parser.add_argument('--train_batch_size', type=int, default=8)
-    parser.add_argument('--prompt_batch_size', type=int, default=16)#32
-    parser.add_argument('--val_batch_size', type=int, default=4)
-    parser.add_argument('--num_workers', type=int, default=4)
-    parser.add_argument('--display_iter', type=int, default=20)
-    parser.add_argument('--snapshot_iter', type=int, default=20)
-    parser.add_argument('--prompt_display_iter', type=int, default=20)
-    parser.add_argument('--prompt_snapshot_iter', type=int, default=100)
-    parser.add_argument('--load_pretrain_unet', type=lambda x: (str(x).lower() == 'true'), default= True)
-    parser.add_argument('--unet_pretrain_dir', type=str, default= './clip_lit_test_1/snapshots_model/best_model_round0.pth')
-    parser.add_argument('--load_pretrain_guidance', type=lambda x: (str(x).lower() == 'true'), default= True)
-    parser.add_argument('--guidance_pretrain_dir', type=str, default= './clip_lit/snapshots_guidance/best_guidance_learner_epoch0.pth')
-    parser.add_argument('--remove_first_n_tokens', type=int, default=0)
- 
-    config = parser.parse_args()
+    parser.add_argument('--cfg', type=str, default="./configs/train/rave.yaml") 
+    args = parser.parse_args()
+    
+    config = OmegaConf.load(args.cfg)
 
     train(config)
 

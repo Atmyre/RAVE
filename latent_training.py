@@ -45,8 +45,8 @@ class LatentVectorsLearner(nn.Module):
 
 
 def init_latent_vector_learner(config):
-    if config.load_pretrain_guidance:
-        latent_learner=LatentVectorsLearner(config.guidance_pretrain_dir).cuda()
+    if config.train.guidance_model.load_pretrain:
+        latent_learner=LatentVectorsLearner(config.train.guidance_model.pretrain_dir).cuda()
     else:
         latent_learner=LatentVectorsLearner().cuda()
     latent_learner =  torch.nn.DataParallel(latent_learner)

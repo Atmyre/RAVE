@@ -107,13 +107,8 @@ model, preprocess = clip.load("ViT-B/32", device=device, download_root="./clip_m
 for para in model.parameters():
 	para.requires_grad = False
 
-def populate_train_list(lowlight_images_path,overlight_images_path=None):
-	if overlight_images_path!=None:
-		image_list_lowlight = glob.glob(lowlight_images_path + "*")
-		image_list_overlight = glob.glob(overlight_images_path + "*")
-		image_list_lowlight += image_list_overlight
-	else:
-		image_list_lowlight = glob.glob(lowlight_images_path + "*")
+def populate_train_list(lowlight_images_path):
+	image_list_lowlight = glob.glob(lowlight_images_path + "*")
 
 	train_list = sorted(image_list_lowlight)
 	#print(train_list)
@@ -125,9 +120,9 @@ def populate_train_list(lowlight_images_path,overlight_images_path=None):
 
 class lowlight_loader(data.Dataset):
 
-	def __init__(self, lowlight_images_path,overlight_images_path=None):
+	def __init__(self, lowlight_images_path):
 
-		self.train_list = populate_train_list(lowlight_images_path,overlight_images_path) 
+		self.train_list = populate_train_list(lowlight_images_path) 
 		self.size = 512
 
 		self.data_list = self.train_list

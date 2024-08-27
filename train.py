@@ -6,6 +6,7 @@ import random
 from collections import OrderedDict
 import pyiqa
 import shutil
+from omegaconf import OmegaConf
 
 import torch
 import torch.nn as nn
@@ -37,23 +38,23 @@ for param in model.parameters():
 
 def initialize_guidance_model(config, guidance_learner, guidance_optimizer, guidance_snapshots_dir):
     # unfreeze pseudo prompts/latent vectors for training
-    if config.mode == 'clip-lit':
+    if config.exp.mode == 'clip-lit':
         guidance_learner.module.prompt_embedding.requires_grad = True
-    elif config.mode == 'clip-lit-latent':
+    elif config.exp.mode == 'clip-lit-latent':
         guidance_learner.module.guidance_embeddings.requires_grad = True
 
-    total_iterations = config.num_clip_pretrained_iters
+    total_iterations = config.train.guidance_model.num_pretrain_iters
     curr_iteration = 0
     best_guidance_learner = guidance_learner
     min_prompt_loss = 100
 
     # load dataset and for pseudo prompts/latent vectors training
-    prompt_train_dataset = dataloader_prompt_add.lowlight_loader(config.lowlight_images_path,
-                                                           config.normallight_images_path)
+    prompt_train_dataset = dataloader_prompt_add.lowlight_loader(config.data.backlit_images_path,
+                                                           config.data.welllit_images_path)
     prompt_train_loader = torch.utils.data.DataLoader(prompt_train_dataset,
-                                                            batch_size=config.prompt_batch_size,
+                                                            batch_size=config.train.guidance_model.batch_size,
                                                             shuffle=True,
-                                                            num_workers=config.num_workers,
+                                                            num_workers=config.train.num_workers,
                                                             pin_memory=True
                                                             )
 
@@ -79,7 +80,7 @@ def initialize_guidance_model(config, guidance_learner, guidance_optimizer, guid
             guidance_optimizer.step()
             
             # logging and saving
-            if ((iteration+1) % config.prompt_display_iter) == 0:
+            if ((iteration+1) % config.train.guidance_model.display_iter) == 0:
                 
                 # if we've got better guidance_learner
                 if loss < min_prompt_loss:
@@ -92,7 +93,7 @@ def initialize_guidance_model(config, guidance_learner, guidance_optimizer, guid
                 #print("output",output.softmax(dim=-1),"label",label)
                 print("cross_entropy_loss",loss)
 
-            if curr_iteration + 1 == total_iterations and loss > config.thre_prompt:
+            if curr_iteration + 1 == total_iterations and loss > config.train.guidance_model.thr_loss:
                 total_iterations += 100
 
             # update iteration counters
@@ -102,7 +103,7 @@ def initialize_guidance_model(config, guidance_learner, guidance_optimizer, guid
             if curr_iteration == total_iterations:
                 # add some more training iterations to pseudo prompts/latent vectors initial training 
                 # if we haven't obtained goood enough model
-                if loss > config.thre_prompt:
+                if loss > config.train.guidance_model.thr_loss:
                     total_iterations += 100
                 else:
                     break
@@ -112,7 +113,7 @@ def initialize_guidance_model(config, guidance_learner, guidance_optimizer, guid
 
 def train(config):
 
-    exp_dir = os.path.join(config.save_dir, config.exp_name)
+    exp_dir = os.path.join(config.exp.save_dir, config.exp.exp_name)
     unet_snapshots_dir = os.path.join(exp_dir, "snapshots_model")
     guidance_snapshots_dir = os.path.join(exp_dir, "snapshots_guidance") 
     
@@ -125,34 +126,32 @@ def train(config):
     
     #add pretrained model weights
     guidance_learner = None
-    if config.mode == 'clip-lit':
+    if config.exp.mode == 'clip-lit':
         guidance_learner = init_prompt_learner(config, model)
-    elif config.mode == 'clip-lit-latent':
+    elif config.exp.mode == 'clip-lit-latent':
         guidance_learner = init_latent_vector_learner(config)
     
     U_net = load_enhancement_model(config)
     
     # load dataset for enhancement model (UNet) training
-    train_dataset = dataloader_sharp.lowlight_loader(config.lowlight_images_path, 
-                                                     config.overlight_images_path
-                                                     )
+    train_dataset = dataloader_sharp.lowlight_loader(config.data.backlit_images_path)
     train_loader = torch.utils.data.DataLoader(train_dataset, 
-                                               batch_size=config.train_batch_size, 
+                                               batch_size=config.train.unet_model.batch_size, 
                                                shuffle=True, 
-                                               num_workers=config.num_workers, 
+                                               num_workers=config.train.num_workers, 
                                                pin_memory=True
                                                )
     
     # loss
-    if config.mode == 'clip-lit':
+    if config.exp.mode == 'clip-lit':
         text_encoder = TextEncoder(model)
     L_clip = clip_score.L_clip_from_feature()
     L_clip_MSE = clip_score.L_clip_MSE()
     L_margin_loss = clip_score.four_margin_loss(0.9,0.2)
     
     # optimizers
-    train_optimizer = torch.optim.Adam(U_net.parameters(), lr=config.train_lr, weight_decay=config.weight_decay)
-    guidance_optimizer = torch.optim.Adam(guidance_learner.parameters(), lr=config.prompt_lr, weight_decay=config.weight_decay)
+    train_optimizer = torch.optim.Adam(U_net.parameters(), lr=config.train.unet_model.lr, weight_decay=config.train.unet_model.weight_decay)
+    guidance_optimizer = torch.optim.Adam(guidance_learner.parameters(), lr=config.train.guidance_model.lr, weight_decay=config.train.guidance_model.weight_decay)
 
     # metric
     iqa_metric = pyiqa.create_metric('psnr', test_y_channel=True, color_space='ycbcr').to(device)
@@ -180,9 +179,9 @@ def train(config):
     guidance_learner, guidance_optimizer, min_prompt_loss = initialize_guidance_model(config, guidance_learner, guidance_optimizer, guidance_snapshots_dir)
     best_guidance_learner = guidance_learner
 
-    for epoch in range(config.num_epochs):
-        if total_iteration < config.num_reconstruction_iters:
-            unet_train_iters = config.num_reconstruction_iters
+    for epoch in range(config.train.num_epochs):
+        if total_iteration < config.train.unet_model.num_reconstruction_iters:
+            unet_train_iters = config.train.unet_model.num_reconstruction_iters
             guidance_model_train_iters = 0
         elif cur_iteration == 0:
             unet_train_iters = 2100
@@ -203,13 +202,13 @@ def train(config):
             if cur_iteration==0:
                 guidance_learner = best_guidance_learner
 
-            if config.mode == 'clip-lit':
+            if config.exp.mode == 'clip-lit':
                 prompt_embedding=guidance_learner.module.prompt_embedding
                 prompt_embedding.requires_grad = False
-                tokenized_pseudo_rompts= torch.cat([clip.tokenize(p) for p in [" ".join(["X"]*config.length_prompt)]])
+                tokenized_pseudo_rompts= torch.cat([clip.tokenize(p) for p in [" ".join(["X"]*config.train.guidance_model.length_prompt)]])
                 eos_indices = tokenized_pseudo_rompts.argmax(dim=-1)
                 guidance_embeddings = text_encoder(prompt_embedding, eos_indices)
-            elif config.mode == 'clip-lit-latent':
+            elif config.exp.mode == 'clip-lit-latent':
                 guidance_embeddings=guidance_learner.module.guidance_embeddings
                 guidance_embeddings.requires_grad = False
             
@@ -237,7 +236,7 @@ def train(config):
                 # reconstruction loss
                 clip_MSEloss = 25*L_clip_MSE(enhanced_image, img_lowlight,[1.0,1.0,1.0,1.0,0.5])
 
-                if total_iteration >= config.num_reconstruction_iters:
+                if total_iteration >= config.train.unet_model.num_reconstruction_iters:
                     # training the model with cliploss and reconstruction loss
                     loss = cliploss + 0.9*clip_MSEloss
                 else:
@@ -251,7 +250,7 @@ def train(config):
                 
                 # 
                 with torch.no_grad():
-                    if total_iteration<config.num_reconstruction_iters+config.num_clip_pretrained_iters:
+                    if total_iteration<config.train.unet_model.num_reconstruction_iters+config.train.guidance_model.num_pretrain_iters:
                         score_psnr[pr_last_few_iter] = torch.mean(iqa_metric(img_lowlight, enhanced_image))
                         reconstruction_iter+=1
                         if sum(score_psnr).item()/30.0 < 8 and reconstruction_iter >100:
@@ -262,15 +261,15 @@ def train(config):
                     pr_last_few_iter += 1
                     if pr_last_few_iter == 30:
                         pr_last_few_iter = 0
-                    if (sum(score_psnr).item()/30.0) > max_score_psnr and ((total_iteration+1) % config.display_iter) == 0:
+                    if (sum(score_psnr).item()/30.0) > max_score_psnr and ((total_iteration+1) % config.train.unet_model.display_iter) == 0:
                         max_score_psnr = sum(score_psnr).item()/30.0
                         torch.save(U_net.state_dict(), os.path.join(unet_snapshots_dir, "best_model_round"+str(curr_epoch) + '.pth'))    
                         best_model = U_net
                         best_model_iter = total_iteration+1
                         print(max_score_psnr)
-                        images_save_path = './'+config.exp_name+'/result_'+config.exp_name+'/result_jt_'+str(total_iteration+1)+"_psnr_or_-loss"+str(max_score_psnr)[:8]+'/'
-                        inference(config.lowlight_images_path, images_save_path, U_net, size=256)
-                        if total_iteration > config.num_reconstruction_iters+config.num_clip_pretrained_iters:
+                        images_save_path = './'+config.exp.exp_name+'/result_'+config.exp.exp_name+'/result_jt_'+str(total_iteration+1)+"_psnr_or_-loss"+str(max_score_psnr)[:8]+'/'
+                        inference(config.data.backlit_images_path, images_save_path, U_net, size=256)
+                        if total_iteration > config.train.unet_model.num_reconstruction_iters+config.train.guidance_model.num_pretrain_iters:
                             semi_path[pr_semi_path] = images_save_path
                             print(semi_path)
                         torch.save(U_net.state_dict(), os.path.join(unet_snapshots_dir, "iter_" + str(total_iteration+1) + '.pth'))
@@ -283,12 +282,12 @@ def train(config):
                     torch.cuda.manual_seed_all(seed)
                     U_net=load_unet(config)
                     reconstruction_iter=0
-                    train_optimizer = torch.optim.Adam(U_net.parameters(), lr=config.train_lr, weight_decay=config.weight_decay)
-                    config.num_reconstruction_iters+=100
+                    train_optimizer = torch.optim.Adam(U_net.parameters(), lr=config.train.unet_model.lr, weight_decay=config.train.unet_model.weight_decay)
+                    config.train.unet_model.num_reconstruction_iters+=100
                     reinit_flag=0
                 
                 # logging
-                if ((total_iteration+1) % config.display_iter) == 0:
+                if ((total_iteration+1) % config.train.unet_model.display_iter) == 0:
                     print("training current learning rate: ",train_optimizer.state_dict()['param_groups'][0]['lr'])
                     print("Loss at iteration", total_iteration+1,"epoch",epoch, ":", loss.item())
                     print("loss_clip",cliploss," reconstruction loss",clip_MSEloss)
@@ -298,7 +297,7 @@ def train(config):
                 cur_iteration += 1
                 total_iteration += 1
 
-                if cur_iteration == unet_train_iters and total_iteration > config.num_reconstruction_iters and (cliploss + 0.9*clip_MSEloss > config.thre_train):
+                if cur_iteration == unet_train_iters and total_iteration > config.train.unet_model.num_reconstruction_iters and (cliploss + 0.9*clip_MSEloss > config.train.unet_model.thr_loss):
                     unet_train_iters += 60
                 elif cur_iteration == unet_train_iters:
                     print("switch to fine-tune the prompt pair")
@@ -308,14 +307,14 @@ def train(config):
         # pseudo prompts/latent vectors fine-tuning
         else:
             
-            if config.mode == 'clip-lit':
+            if config.exp.mode == 'clip-lit':
                 guidance_learner.module.prompt_embedding.requires_grad = True
-            elif config.mode == 'clip-lit-latent':
+            elif config.exp.mode == 'clip-lit-latent':
                 guidance_learner.module.guidance_embeddings.requires_grad = True
 
             # load the data on the start of fine-tuning 
             if cur_iteration == unet_train_iters:
-                if total_iteration >= config.num_clip_pretrained_iters:
+                if total_iteration >= config.train.guidance_model.num_pretrain_iters:
                     pr_semi_path = 1-pr_semi_path
 
 
@@ -323,37 +322,37 @@ def train(config):
                 # depending on if results from previous iteration are available
                 if semi_path[0]=='':
                     L_margin_loss = clip_score.four_margin_loss(1.0,0.2)
-                    guidance_train_dataset = dataloader_prompt_margin.lowlight_loader(config.lowlight_images_path,
-                                                                                      config.normallight_images_path
+                    guidance_train_dataset = dataloader_prompt_margin.lowlight_loader(config.data.backlit_images_path,
+                                                                                      config.data.welllit_images_path
                                                                                       )     
                     guidance_train_loader = torch.utils.data.DataLoader(guidance_train_dataset, 
-                                                                        batch_size=config.prompt_batch_size, 
+                                                                        batch_size=config.train.guidance_model.batch_size, 
                                                                         shuffle=True, 
-                                                                        num_workers=config.num_workers, 
+                                                                        num_workers=config.train.num_workers, 
                                                                         pin_memory=True)
                 elif semi_path[1]=='':
                     L_margin_loss = clip_score.four_margin_loss(0.9,0.2)
-                    guidance_train_dataset = dataloader_prompt_margin.lowlight_loader(config.lowlight_images_path,
-                                                                                      config.normallight_images_path,
+                    guidance_train_dataset = dataloader_prompt_margin.lowlight_loader(config.data.backlit_images_path,
+                                                                                      config.data.welllit_images_path,
                                                                                       semi_path[0]
                                                                                       )
                     guidance_train_loader = torch.utils.data.DataLoader(guidance_train_dataset, 
-                                                                      batch_size=config.prompt_batch_size, 
+                                                                      batch_size=config.train.guidance_model.batch_size, 
                                                                       shuffle=True, 
-                                                                      num_workers=config.num_workers, 
+                                                                      num_workers=config.train.num_workers, 
                                                                       pin_memory=True
                                                                       )
                 else:
                     L_margin_loss = clip_score.four_margin_loss(0.9,0.1)
-                    guidance_train_dataset = dataloader_prompt_margin.lowlight_loader(config.lowlight_images_path,
-                                                                                    config.normallight_images_path,
+                    guidance_train_dataset = dataloader_prompt_margin.lowlight_loader(config.data.backlit_images_path,
+                                                                                    config.data.welllit_images_path,
                                                                                     semi_path[1-pr_semi_path],
                                                                                     semi_path[pr_semi_path]
                                                                                     )
                     guidance_train_loader = torch.utils.data.DataLoader(guidance_train_dataset, 
-                                                                      batch_size=config.prompt_batch_size, 
+                                                                      batch_size=config.train.guidance_model.batch_size, 
                                                                       shuffle=True, 
-                                                                      num_workers=config.num_workers, 
+                                                                      num_workers=config.train.num_workers, 
                                                                       pin_memory=True
                                                                       )
             
@@ -398,7 +397,7 @@ def train(config):
                 
 
                 # logging and saving
-                if ((total_iteration + 1) % config.prompt_display_iter) == 0:
+                if ((total_iteration + 1) % config.train.guidance_model.display_iter) == 0:
                     if loss < min_prompt_loss:
                         min_prompt_loss = loss
                         best_guidance_learner = guidance_learner
@@ -419,7 +418,7 @@ def train(config):
                 if cur_iteration == unet_train_iters + guidance_model_train_iters:
                     # add some more training iterations to pseudo prompts/latent vectors initial training 
                     # if we haven't obtained goood enough model
-                    if loss > config.thre_prompt:
+                    if loss > config.train.guidance_model.thr_loss:
                         guidance_model_train_iters += 100
                     else:
                         break
@@ -428,43 +427,10 @@ def train(config):
 if __name__ == "__main__": 
 
     parser = argparse.ArgumentParser()
-
-    # Input Parameters
-    parser.add_argument('--mode', type=str, default="clip-lit") 
-    parser.add_argument('--exp_name', type=str, default='clip_lit') 
-    parser.add_argument('--save_dir', type=str, default="./") 
-    parser.add_argument('-b','--lowlight_images_path', type=str, default="./train_data/BAID_380/resize_input/") 
-    parser.add_argument('--overlight_images_path', type=str, default=None)
-    parser.add_argument('-r','--normallight_images_path', type=str, default='./train_data/DIV2K_384/') 
-    parser.add_argument('--length_prompt', type=int, default=16)
-    parser.add_argument('--thre_train', type=float, default=90)
-    parser.add_argument('--thre_prompt', type=float, default=60)
-    parser.add_argument('--reconstruction_train_lr',type=float,default=0.00005)
-    parser.add_argument('--train_lr', type=float, default=0.00002)
-    parser.add_argument('--prompt_lr', type=float, default=0.000005)
-    parser.add_argument('--T_max', type=float, default=100)
-    parser.add_argument('--eta_min', type=float, default=5e-6)
-    parser.add_argument('--weight_decay', type=float, default=0.001)
-    parser.add_argument('--grad_clip_norm', type=float, default=0.1)
-    parser.add_argument('--num_epochs', type=int, default=3000)
-    parser.add_argument('--num_reconstruction_iters', type=int, default=0)
-    parser.add_argument('--num_clip_pretrained_iters', type=int, default=0)
-    parser.add_argument('--noTV_epochs', type=int, default=100)
-    parser.add_argument('--train_batch_size', type=int, default=8)
-    parser.add_argument('--prompt_batch_size', type=int, default=16)
-    parser.add_argument('--val_batch_size', type=int, default=4)
-    parser.add_argument('--num_workers', type=int, default=4)
-    parser.add_argument('--display_iter', type=int, default=20)
-    parser.add_argument('--snapshot_iter', type=int, default=20)
-    parser.add_argument('--prompt_display_iter', type=int, default=20)
-    parser.add_argument('--prompt_snapshot_iter', type=int, default=100)
-    parser.add_argument('--load_pretrain_unet', type=lambda x: (str(x).lower() == 'true'), default= True)
-    parser.add_argument('--unet_pretrain_dir', type=str, default= './clip_lit_test_1/snapshots_model/best_model_round0.pth')
-    parser.add_argument('--load_pretrain_guidance', type=lambda x: (str(x).lower() == 'true'), default= True)
-    parser.add_argument('--guidance_pretrain_dir', type=str, default= './clip_lit/snapshots_guidance/best_guidance_learner_epoch0.pth')
+    parser.add_argument('--cfg', type=str, default="./configs/train/clip_lit.yaml") 
+    args = parser.parse_args()
     
-    config = parser.parse_args()
-  
+    config = OmegaConf.load(args.cfg)
 
     train(config)
 

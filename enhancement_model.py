@@ -120,11 +120,10 @@ def load_enhancement_model(config, padding_mode='zeros'):
     # load enhancement model, it's same for any mode
     U_net=UNet_emb_oneBranch_symmetry(3, 1, padding_mode=padding_mode).cuda()
     U_net.apply(weights_init)
-    if config.load_pretrain_unet:
-        print("The load_pretrain is True, thus num_reconstruction_iters is automatically set to 0.")
-        config.num_reconstruction_iters=0
-        state_dict = torch.load(config.unet_pretrain_dir)
+
+    if config.train.unet_model.load_pretrain:
         # create new OrderedDict that does not contain `module.`
+        state_dict = torch.load(config.train.unet_model.pretrain_dir)
         new_state_dict = OrderedDict()
         for k, v in state_dict.items():
             name = k[7:] # remove `module.`
