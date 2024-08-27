@@ -3,6 +3,7 @@ import os
 import numpy as np
 import argparse
 from PIL import Image
+from omegaconf import OmegaConf
 
 import torch
 import torch.nn as nn
@@ -83,11 +84,10 @@ def compute_metrics(enhanced_images_path, gt_images_path):
 if __name__ == "__main__": 
 
     parser = argparse.ArgumentParser()
+    parser.add_argument('--cfg', type=str, default="./configs/inference/metrics.yaml") 
+    args = parser.parse_args()
     
-    parser.add_argument('--gt_images_path', type=str, default="./test_data/BAID/test/resize_gt/") 
-    parser.add_argument('--enhanced_images_path', type=str, default="./inference_results/enhanced_images/") 
-    
-    config = parser.parse_args()
+    config = OmegaConf.load(args.cfg)
     
     psnr_scores, ssim_scores, lpips_scores = compute_metrics(config.enhanced_images_path, config.gt_images_path)
     

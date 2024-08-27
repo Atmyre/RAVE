@@ -121,9 +121,9 @@ def load_enhancement_model(config, padding_mode='zeros'):
     U_net=UNet_emb_oneBranch_symmetry(3, 1, padding_mode=padding_mode).cuda()
     U_net.apply(weights_init)
 
-    if config.train.unet_model.load_pretrain:
+    if config.unet_model.load_pretrain:
         # create new OrderedDict that does not contain `module.`
-        state_dict = torch.load(config.train.unet_model.pretrain_dir)
+        state_dict = torch.load(config.unet_model.pretrain_dir)
         new_state_dict = OrderedDict()
         for k, v in state_dict.items():
             name = k[7:] # remove `module.`

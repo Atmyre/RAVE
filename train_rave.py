@@ -78,7 +78,7 @@ def train(config):
                                                      config.data.welllit_images_path
                                                      )
     train_loader = torch.utils.data.DataLoader(train_dataset, 
-                                               batch_size=config.train.unet_model.batch_size, 
+                                               batch_size=config.unet_model.batch_size, 
                                                shuffle=True, 
                                                num_workers=config.train.num_workers, 
                                                pin_memory=True
@@ -89,7 +89,7 @@ def train(config):
     L_clip_MSE = clip_score.L_clip_MSE()
     
     # optimizers
-    train_optimizer = torch.optim.Adam(U_net.parameters(), lr=config.train.unet_model.lr, weight_decay=config.train.unet_model.weight_decay)
+    train_optimizer = torch.optim.Adam(U_net.parameters(), lr=config.unet_model.lr, weight_decay=config.unet_model.weight_decay)
    
     # metric
     iqa_metric = pyiqa.create_metric('psnr', test_y_channel=True, color_space='ycbcr').to(device)
@@ -118,7 +118,7 @@ def train(config):
     residual_vector = vector_pos - vector_neg
     residual_vector = residual_vector / np.linalg.norm(residual_vector)
 
-    if config.train.guidance.remove_first_n_tokens > 0:
+    if config.guidance.remove_first_n_tokens > 0:
 
         token_scores = {}
         for key in vocab_embs.keys():
@@ -163,8 +163,8 @@ def train(config):
     
     for epoch in range(config.train.num_epochs):
 
-        if total_iteration < config.train.unet_model.num_reconstruction_iters:
-            unet_train_iters = config.train.unet_model.num_reconstruction_iters
+        if total_iteration < config.unet_model.num_reconstruction_iters:
+            unet_train_iters = config.unet_model.num_reconstruction_iters
         elif cur_iteration == 0:
             unet_train_iters = 2100
 
@@ -193,7 +193,7 @@ def train(config):
                 # reconstruction loss
                 clip_MSEloss = 25*L_clip_MSE(enhanced_image, img_lowlight,[1.0,1.0,1.0,1.0,0.5])
 
-                if total_iteration >= config.train.unet_model.num_reconstruction_iters:
+                if total_iteration >= config.unet_model.num_reconstruction_iters:
                     # training the model with cliploss and reconstruction loss
                     loss = 6*cliploss + 0.9*clip_MSEloss
                 else:
@@ -207,7 +207,7 @@ def train(config):
 
                 # 
                 with torch.no_grad():
-                    if total_iteration<config.train.unet_model.num_reconstruction_iters:
+                    if total_iteration<config.unet_model.num_reconstruction_iters:
                         score_psnr[pr_last_few_iter] = torch.mean(iqa_metric(img_lowlight, enhanced_image))
                         reconstruction_iter+=1
                         if sum(score_psnr).item()/30.0 < 8 and reconstruction_iter >100:
@@ -218,7 +218,7 @@ def train(config):
                     pr_last_few_iter += 1
                     if pr_last_few_iter == 30:
                         pr_last_few_iter = 0
-                    if (sum(score_psnr).item()/30.0) > max_score_psnr and ((total_iteration+1) % config.train.unet_model.display_iter) == 0:
+                    if (sum(score_psnr).item()/30.0) > max_score_psnr and ((total_iteration+1) % config.unet_model.display_iter) == 0:
                         max_score_psnr = sum(score_psnr).item()/30.0
                         torch.save(U_net.state_dict(), os.path.join(unet_snapshots_dir, "best_model_round"+str(curr_epoch) + '.pth'))    
                         best_model = U_net
@@ -234,12 +234,12 @@ def train(config):
                     torch.cuda.manual_seed_all(seed)
                     U_net=load_unet(config)
                     reconstruction_iter=0
-                    train_optimizer = torch.optim.Adam(U_net.parameters(), lr=config.train.unet_model.lr, weight_decay=config.train.unet_model.weight_decay)
-                    config.train.unet_model.num_reconstruction_iters+=100
+                    train_optimizer = torch.optim.Adam(U_net.parameters(), lr=config.unet_model.lr, weight_decay=config.unet_model.weight_decay)
+                    config.unet_model.num_reconstruction_iters+=100
                     reinit_flag=0
                 
                 # logging
-                if ((total_iteration+1) % config.train.unet_model.display_iter) == 0:
+                if ((total_iteration+1) % config.unet_model.display_iter) == 0:
                     print("training current learning rate: ",train_optimizer.state_dict()['param_groups'][0]['lr'])
                     print("Loss at iteration", total_iteration+1,"epoch",epoch, ":", loss.item())
                     print("loss_clip",cliploss," reconstruction loss",clip_MSEloss)
@@ -249,7 +249,7 @@ def train(config):
                 cur_iteration += 1
                 total_iteration += 1
 
-                if cur_iteration == unet_train_iters and total_iteration > config.train.unet_model.num_reconstruction_iters and (cliploss + 0.9*clip_MSEloss > config.ttrain.unet_model.thr_loss):
+                if cur_iteration == unet_train_iters and total_iteration > config.unet_model.num_reconstruction_iters and (cliploss + 0.9*clip_MSEloss > config.unet_model.thr_loss):
                     unet_train_iters += 60
                 elif cur_iteration == unet_train_iters:
                     break

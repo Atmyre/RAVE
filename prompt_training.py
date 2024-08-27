@@ -39,7 +39,7 @@ class PromptLearner(nn.Module):
 
         # determining eos indices for pseudo prompts 
         # for TextEncoder to know where CLF token in CLIP embeddings is
-        tokenized_pseudo_rompts= torch.cat([clip.tokenize(p) for p in [" ".join(["X"]*config.train.guidance_model.length_prompt)]])
+        tokenized_pseudo_rompts= torch.cat([clip.tokenize(p) for p in [" ".join(["X"]*config.guidance_model.length_prompt)]])
         self.eos_indices = tokenized_pseudo_rompts.argmax(dim=-1)
 
         if isinstance(initials, list):
@@ -57,7 +57,7 @@ class PromptLearner(nn.Module):
             self.prompt_embedding=nn.Parameter(new_state_dict['prompt_embedding']).cuda()
             self.prompt_embedding.requires_grad = True
         else:
-            self.prompt_embedding=torch.nn.init.xavier_normal_(nn.Parameter(model.token_embedding([" ".join(["X"]*config.train.guidance_model.length_prompt)," ".join(["X"]*config.train.guidance_model.length_prompt)]).requires_grad_())).cuda()
+            self.prompt_embedding=torch.nn.init.xavier_normal_(nn.Parameter(model.token_embedding([" ".join(["X"]*config.guidance_model.length_prompt)," ".join(["X"]*config.guidance_model.length_prompt)]).requires_grad_())).cuda()
 
     def forward(self, tensor, use_softmax=1):
         pseudo_prompt_latent_vectors = self.text_encoder(self.prompt_embedding, self.eos_indices)
@@ -81,10 +81,10 @@ class PromptLearner(nn.Module):
 
 
 def init_prompt_learner(config, model):
-    if config.train.guidance_model.load_pretrain:
-        prompt_learner=PromptLearner(config, model, initials=config.train.guidance_model.pretrain_dir, ).cuda()
+    if config.guidance_model.load_pretrain:
+        prompt_learner=PromptLearner(config, model, initials=config.guidance_model.pretrain_dir, ).cuda()
     else:
-        prompt_learner=PromptLearner(config, model, initials=[" ".join(["X"]*(config.train.guidance_model.length_prompt))," ".join(["X"]*(config.train.guidance_model.length_prompt))]).cuda()
+        prompt_learner=PromptLearner(config, model, initials=[" ".join(["X"]*(config.guidance_model.length_prompt))," ".join(["X"]*(config.guidance_model.length_prompt))]).cuda()
     prompt_learner =  torch.nn.DataParallel(prompt_learner)
 
     return prompt_learner

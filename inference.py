@@ -2,6 +2,7 @@ import torch
 import os
 import time
 from tqdm import tqdm
+from omegaconf import OmegaConf
 
 import numpy as np
 from PIL import Image
@@ -48,15 +49,13 @@ def inference(image_list_path, result_list_path, unet_model, size=None):
 if __name__ == '__main__':
 
 	parser = argparse.ArgumentParser()
-	parser.add_argument('-i', '--input', help='directory of input folder', default='./input/')
-	parser.add_argument('-o', '--output', help='directory of output folder', default='./inference_result/')
-	parser.add_argument('-c', '--unet_pretrain_dir', help='enhancement model pretrained ckpt path', default='./pretrained_models/enhancement_model.pth')
+    parser.add_argument('--cfg', type=str, default="./configs/inference/inference.yaml") 
+    args = parser.parse_args()
+    
+    config = OmegaConf.load(args.cfg)
 
-	args = parser.parse_args()
-	args.load_pretrain_unet = True
+	U_net = load_enhancement_model(config, padding_mode='reflect')
 
-	U_net = load_enhancement_model(args, padding_mode='reflect')
-
-	inference(args.input, args.output, U_net)
+	inference(config.input, config.output, U_net)
 
 

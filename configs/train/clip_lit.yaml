@@ -11,23 +11,23 @@ train:
   num_epochs: 3000
   num_workers: 4
 
-  unet_model:
-    thr_loss: 90
-    lr: 0.00002
-    weight_decay: 0.001
-    num_reconstruction_iters: 1000
-    batch_size: 8
-    display_iter: 20
-    load_pretrain: False
-    pretrain_dir: ''
+unet_model:
+  thr_loss: 90
+  lr: 0.00002
+  weight_decay: 0.001
+  num_reconstruction_iters: 1000
+  batch_size: 8
+  display_iter: 20
+  load_pretrain: False
+  pretrain_dir: ''
 
-  guidance_model:
-    weight_decay: 0.001
-    length_prompt: 16
-    thr_loss: 60
-    lr: 0.000005
-    num_pretrain_iters: 8000
-    batch_size: 16
-    display_iter: 20
-    load_pretrain: False
-    pretrain_dir: ''
+guidance_model:
+  weight_decay: 0.001
+  length_prompt: 16
+  thr_loss: 60
+  lr: 0.000005
+  num_pretrain_iters: 8000
+  batch_size: 16
+  display_iter: 20
+  load_pretrain: False
+  pretrain_dir: ''

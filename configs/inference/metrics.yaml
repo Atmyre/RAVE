@@ -1,0 +1,4 @@
+data:
+  gt_images_path: ./test_data/BAID/test/resize_gt/
+  enhanced_images_path: ./inference_results/enhanced_images/
+

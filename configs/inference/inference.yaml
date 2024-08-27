@@ -1,0 +1,8 @@
+unet_model:
+  load_pretrain: True
+  pretrain_dir: ./pretrained_models/enhancement_model.pth
+
+data:
+  input: ./input/
+  output: ./inference_result/
+
