@@ -40,111 +40,31 @@ Training and testing data can be downloaded from:
 
 ### :heavy_check_mark: Run Training:
 
-#### :heavy_minus_sign: CLIP-LIT
+#### :heavy_minus_sign: CLIP-LIT and CLIP-LIT-Latent
 
-Train from scratch:
-
-```
-python train.py \
- -b path_to_backlit_train_images  \
- -r path_to_well_lit_train_images \
- --mode clip-lit                  \
- --exp_name clip_lit              \
- --train_lr 0.00002               \
- --prompt_lr 0.000005             \
- --num_reconstruction_iters 1000  \
- --num_clip_pretrained_iters 8000 \
- --load_pretrain_unet False       \
- --load_pretrain_guidance False   \
+Train CLIP-LIT:
+ ```
+python train.py --cfg ./configs/train/clip_lit.yaml
  ```
 
-If you have pre-trained Unet and/or guidance model checkpoints, you can resume training as follows:
-
-```
- python train.py \
- -b path_to_backlit_train_images  \
- -r path_to_well_lit_train_images \
- --mode clip-lit                  \
- --exp_name clip_lit              \
- --train_lr 0.00002               \
- --prompt_lr 0.000005             \
- --num_reconstruction_iters 0     \ # if you have UNet ckpt, change this to 0
- --num_clip_pretrained_iters 0    \ # if you have guidance model ckpt, change this to 0
- --load_pretrain_unet True        \
- --unet_pretrain_dir path_to_unet_ckpt \
- --load_pretrain_guidance True    \
- --guidance_pretrain_dir path_to_guidance_model_ckpt \
+Train CLIP-LIT-Latent:
  ```
-
- #### :heavy_minus_sign: CLIP-LIT-Latent
-
-Train from scratch:
-
-```
-python train.py \
- -b path_to_backlit_train_images  \
- -r path_to_well_lit_train_images \
- --mode clip-lit-latent           \
- --exp_name clip_lit-latent       \
- --train_lr 0.00002               \
- --prompt_lr 0.0005               \
- --num_reconstruction_iters 1000  \
- --num_clip_pretrained_iters 8000 \
- --load_pretrain_unet False       \
- --load_pretrain_guidance False   \
+python train.py --cfg ./configs/train/clip_lit_latent.yaml
  ```
+Before running, make sure paths to training data in the config are correct (`backlit_images_path` and `welllit_images_path` in config)
 
-If you have pre-trained Unet and/or guidance model checkpoints, you can resume training as follows:
+If you have pre-trained Unet and/or guidance model checkpoints, you can resume training by changing arguments `load_pretrain` corresponding to  Unet/guidance model in the config. For more information on config arguments see Readme.md in config directory.
 
-```
- python train.py \
- -b path_to_backlit_train_images  \
- -r path_to_well_lit_train_images \
- --mode clip-lit-latent           \
- --exp_name clip_lit              \
- --train_lr 0.00002               \
- --prompt_lr 0.0005               \
- --num_reconstruction_iters 0     \ # if you have UNet ckpt, change this to 0
- --num_clip_pretrained_iters 0    \ # if you have guidance model ckpt, change this to 0
- --load_pretrain_unet True        \
- --unet_pretrain_dir path_to_unet_ckpt \
- --load_pretrain_guidance True    \
- --guidance_pretrain_dir path_to_guidance_model_ckpt \
+#### :heavy_minus_sign: RAVE
+
+Train RAVE:
+
  ```
-
-
- #### :heavy_minus_sign: RAVE
-
-Train from scratch without shifting the residual vector:
-
-```
-python train_rave.py \
- -b path_to_backlit_train_images  \
- -r path_to_well_lit_train_images \
- --exp_name rave                  \
- --train_lr 0.00002               \
- --num_reconstruction_iters 1000  \
- --load_pretrain_unet False       \
+python train_rave.py --cfg ./configs/train/rave.yaml
  ```
+Before running, make sure paths to training data in the config are correct (`backlit_images_path` and `welllit_images_path` in config)
 
-To train RAVE with shifted residual by n tokens add the following instruction:
- ```
- --remove_first_n_tokens n         \
- ```
-
-
-If you have pre-trained Unet, you can resume training as follows:
-
-```
-python train_rave.py \
- -b path_to_backlit_train_images  \
- -r path_to_well_lit_train_images \
- --exp_name rave                  \
- --train_lr 0.00002               \
- --num_reconstruction_iters 1000  \
- --load_pretrain_unet False       \
- --unet_pretrain_dir path_to_unet_ckpt \
- ```
+To train RAVE with shifted residual by n tokens, change the `remove_first_n_tokens` argument in the config.
 
 
 ### :heavy_check_mark: Inferencing and Testing:
@@ -168,21 +88,19 @@ Models trained on unpaired data:
 To run trained model on backlit images use the following command:
 
 ```
-python inference.py \
- --input path_to_input_images \
- --output path_to_output_dir  \
- --unet_pretrain_dir path_to_pretrained_ckpt
+python inference.py --cfg ./configs/inference/inference.yaml
 ```
+
+Before running, make sure that the path to testing data in the config is correct (`input` in config)
 
 #### :heavy_minus_sign: Testing (computing metrics)
 
-To compute metrics (SSIM, PSNR, LPIPS, FID) on bunch of backlit and corresponding enhanced images, use the following command:
+To compute metrics (SSIM, PSNR, LPIPS) on bunch of backlit and corresponding enhanced images, use the following command:
 
 ```
-python compute_metrics.py \
- --gt_images_path path_to_ground_truth_well_lit_images \
- --enhanced_images_path path_to_ground_enhanced_images  
+python compute_metrics.py --cfg ./configs/inference/metrics.yaml 
 ```
+Before running, make sure that the paths to ground-truth well-lit data and enhanced images in the config are correct (`gt_images_path` and `enhanced_images_path` in config)
 
 ## :bookmark: Citation
 If you find our work useful, please consider citing the paper:
