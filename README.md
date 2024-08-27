@@ -33,7 +33,7 @@ In RAVE <strong>we exploit arithmetic defined in the CLIP latent space</strong>.
 
 ### :heavy_check_mark: Training and Testing Data:
 Training and testing data can be downloaded from:
-- [BAID dataset (train and test parts)](https://drive.google.com/drive/folders/14_OvT17bfoN-JEH0GTFD6bnKzjKmag_l?usp=sharing);
+- [BAID dataset](https://drive.google.com/drive/folders/14_OvT17bfoN-JEH0GTFD6bnKzjKmag_l?usp=sharing) (train and test parts);
 - [DIV2K images](https://drive.google.com/drive/folders/1PbWzGzxLF0OJMyA7zMj_Dd00UB_ulhb4?usp=sharing) (well-lit images used instead of well-lit images from BAID for training models in unpaired setting);
 - [LOL-v1 dataset](https://drive.google.com/drive/folders/1ewmaFEVjKmzS8fLisSA7q_t1RbBdz6He?usp=sharing) for low-light image enhancement task (see supplementary material of RAVE paper for results on this data).
 
@@ -71,7 +71,7 @@ To train RAVE with shifted residual by n tokens, change the `remove_first_n_toke
 
 #### :heavy_minus_sign: Pretrained checkpoints
 
-Pretrained checkpoints for all the models are stored in 'pretrained_models' dir.
+Pretrained checkpoints for all the models are stored in `pretrained_models` dir.
 
 Models trained on paired data:
 - <strong>CLIP-LIT</strong>: clip_lit_paired.pth;
