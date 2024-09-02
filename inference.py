@@ -11,18 +11,19 @@ from enhancement_model import load_enhancement_model
 
 def create_transform(size=None):
     transform_list = [
+        transforms.Lambda(lambda img: img.convert("RGB") if img.mode != "RGB" else img),  # Ensure image is in RGB
         transforms.ToTensor(),
         transforms.Lambda(lambda x: x.cuda())
     ]
     if size:
-        transform_list.insert(0, transforms.Resize((size, size), Image.ANTIALIAS))
+        transform_list.insert(1, transforms.Resize((size, size), Image.ANTIALIAS))  # Adjusted index for Resize
     return transforms.Compose(transform_list)
 
 
 def enhance_image(image_path, output_path, model, transform):
     img = Image.open(image_path)
     img_tensor = transform(img).unsqueeze(0)
-
+    print(img_tensor.shape)
     light_map = model(img_tensor)
     enhanced = torch.clamp(img_tensor / light_map, 0, 1)
     
@@ -46,4 +47,4 @@ if __name__ == '__main__':
     
     config = OmegaConf.load(args.cfg)
     model = load_enhancement_model(config, padding_mode='reflect')
-    process_directory(config.input, config.output, model)
+    process_directory(config.data.input, config.data.output, model)
