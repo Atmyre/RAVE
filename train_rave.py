@@ -232,7 +232,7 @@ def train(config):
                     seed=random.randint(0,100000)
                     print("current random seed: ",seed)
                     torch.cuda.manual_seed_all(seed)
-                    U_net=load_unet(config)
+                    U_net=load_enhancement_model(config)
                     reconstruction_iter=0
                     train_optimizer = torch.optim.Adam(U_net.parameters(), lr=config.unet_model.lr, weight_decay=config.unet_model.weight_decay)
                     config.unet_model.num_reconstruction_iters+=100
