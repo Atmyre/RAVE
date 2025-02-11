@@ -20,7 +20,7 @@ import dataloader_images as dataloader_sharp
 from enhancement_model import load_enhancement_model
 from prompt_training import PromptLearner, TextEncoder, init_prompt_learner
 from latent_training import LatentVectorsLearner, init_latent_vector_learner
-from inference import inference
+from inference import process_directory
 
 import clip
 import clip_score
