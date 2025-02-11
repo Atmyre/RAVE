@@ -268,7 +268,7 @@ def train(config):
                         best_model_iter = total_iteration+1
                         print(max_score_psnr)
                         images_save_path = './'+config.exp.exp_name+'/result_'+config.exp.exp_name+'/result_jt_'+str(total_iteration+1)+"_psnr_or_-loss"+str(max_score_psnr)[:8]+'/'
-                        inference(config.data.backlit_images_path, images_save_path, U_net, size=256)
+                        process_directory(config.data.backlit_images_path, images_save_path, U_net, size=256)
                         if total_iteration > config.unet_model.num_reconstruction_iters+config.guidance_model.num_pretrain_iters:
                             semi_path[pr_semi_path] = images_save_path
                             print(semi_path)
